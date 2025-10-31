@@ -7,6 +7,17 @@
 </head>
 <body>
     <h1>Dynamic Quote Generator</h1>
+    
+    <!-- Category Filter -->
+    <label for="categoryFilter">Select Category:</label>
+    <select id="categoryFilter" onchange="filterQuotes()">
+        <option value="all">All Categories</option>
+        <option value="inspirational">Inspirational</option>
+        <option value="funny">Funny</option>
+        <option value="life">Life</option>
+        <!-- Add more categories as needed -->
+    </select>
+
     <div id="quoteDisplay"></div>
     <button id="newQuote">Show New Quote</button>
     <button id="exportQuote">Export Quotes</button> <!-- Changed label to "Export Quotes" -->
@@ -31,6 +42,14 @@
                 alert('Please generate a quote first!');
             }
         });
+
+        function filterQuotes() {
+            const category = document.getElementById('categoryFilter').value;
+            // Logic to filter quotes based on the selected category
+            // This function should interact with your quote data source
+            console.log('Selected category:', category);
+            // Implement filtering logic here
+        }
     </script>
 </body>
 </html>
