@@ -215,15 +215,24 @@ async function fetchServerQuotes() {
     return await fetchQuotesFromServer();
 }
 
-// Compare and sync with local quotes. Server wins on conflicts.
+// Replace previous compareAndSync implementation to delegate to syncQuotes
 async function compareAndSync() {
-    // First attempt to flush local outbox
+    return await syncQuotes();
+}
+
+// New: syncQuotes performs a full sync cycle (flush outbox, fetch server, detect diffs, apply or notify)
+// Options: { autoApply: true } -> apply server data automatically (server wins). If false, show notification for manual review.
+async function syncQuotes(options = { autoApply: true }) {
+    // 1) Flush local outbox first
     await syncOutbox();
 
-    const serverQuotes = await fetchServerQuotes();
-    if (!serverQuotes) return;
+    // 2) Fetch server quotes
+    const serverQuotes = await fetchQuotesFromServer();
+    if (!serverQuotes) {
+        return { success: false, reason: 'fetch_failed' };
+    }
 
-    // Detect new server items and conflicts
+    // 3) Compute new items and conflicts (matching by text)
     const localByText = new Map(quotes.map(q => [q.text, q]));
     const newServerItems = serverQuotes.filter(s => !localByText.has(s.text));
     const conflicts = serverQuotes.filter(s => {
@@ -231,12 +240,29 @@ async function compareAndSync() {
         return local && local.category !== s.category;
     });
 
+    // 4) If nothing to do, return
     if (newServerItems.length === 0 && conflicts.length === 0) {
-        // nothing to sync
-        return;
+        return { success: true, applied: false, message: 'no_changes' };
     }
 
-    showSyncNotification({ newServerItems, conflicts, serverQuotes });
+    // 5) Either auto-apply server data or notify user for manual resolution
+    if (options.autoApply) {
+        applyServerData(serverQuotes); // server precedence merge + update UI/storage
+        return {
+            success: true,
+            applied: true,
+            newServerItems: newServerItems.length,
+            conflicts: conflicts.length
+        };
+    } else {
+        showSyncNotification({ newServerItems, conflicts, serverQuotes });
+        return {
+            success: true,
+            applied: false,
+            newServerItems: newServerItems.length,
+            conflicts: conflicts.length
+        };
+    }
 }
 
 // Apply server data automatically (server precedence): merge with local, server items override
