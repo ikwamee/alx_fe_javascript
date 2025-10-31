@@ -63,14 +63,17 @@ async function syncOutbox() {
         if (!result.success) {
             remaining.push(q);
         } else {
-            // Optionally handle server response (result.data)
             console.log('Outbox item posted:', result.data);
         }
     }
     outbox = remaining;
     saveOutbox();
-    if (remaining.length === 0) showFeedback('All pending quotes synced to server.', 'success');
-    else showFeedback(`${remaining.length} quote(s) remain unsynced.`, 'error');
+    if (remaining.length === 0) {
+        showFeedback('All pending quotes synced to server.', 'success');
+        alert('Quotes synced with server!');
+    } else {
+        showFeedback(`${remaining.length} quote(s) remain unsynced.`, 'error');
+    }
 }
 
 function populateCategories() {
@@ -267,11 +270,10 @@ async function syncQuotes(options = { autoApply: true }) {
 
 // Apply server data automatically (server precedence): merge with local, server items override
 function applyServerData(serverQuotes) {
-    // Remove local items that have same text as a server item, then add server items
     const serverTexts = new Set(serverQuotes.map(s => s.text));
     const merged = [
-        ...quotes.filter(l => !serverTexts.has(l.text)), // local-only items
-        ...serverQuotes.map(s => ({ text: s.text, category: s.category })) // server items (override)
+        ...quotes.filter(l => !serverTexts.has(l.text)),
+        ...serverQuotes.map(s => ({ text: s.text, category: s.category }))
     ];
     quotes = merged;
     saveQuotes();
@@ -279,6 +281,7 @@ function applyServerData(serverQuotes) {
     showRandomQuote();
     dismissSyncNotification();
     showFeedback('Synchronized with server (server data applied).', 'success');
+    alert('Quotes synced with server!');
 }
 
 // Notification UI for sync/conflicts
