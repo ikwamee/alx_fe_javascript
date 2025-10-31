@@ -1,6 +1,15 @@
 let quotes = [];
 let selectedCategory = 'all';
 
+// Outbox for quotes pending POST to server
+let outbox = [];
+
+// Server endpoints
+const SERVER_API_URL = 'https://jsonplaceholder.typicode.com/posts?_limit=8'; // mock GET endpoint
+const SERVER_POST_URL = 'https://jsonplaceholder.typicode.com/posts'; // mock POST endpoint
+const SERVER_SYNC_INTERVAL_MS = 30000; // 30 seconds
+let serverSyncTimer = null;
+
 function loadQuotes() {
     const savedQuotes = localStorage.getItem('quotes');
     quotes = savedQuotes ? JSON.parse(savedQuotes) : [
@@ -13,6 +22,55 @@ function loadQuotes() {
 
 function saveQuotes() {
     localStorage.setItem('quotes', JSON.stringify(quotes));
+}
+
+// Outbox persistence
+function loadOutbox() {
+    const saved = localStorage.getItem('quoteOutbox');
+    outbox = saved ? JSON.parse(saved) : [];
+}
+
+function saveOutbox() {
+    localStorage.setItem('quoteOutbox', JSON.stringify(outbox));
+}
+
+// New: post a single quote to the server using POST
+async function postQuoteToServer(quote) {
+    try {
+        const res = await fetch(SERVER_POST_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json; charset=utf-8'
+            },
+            body: JSON.stringify(quote)
+        });
+        if (!res.ok) throw new Error(`POST failed (${res.status})`);
+        const data = await res.json();
+        // Server returns created resource (mock); could store id if needed
+        return { success: true, data };
+    } catch (err) {
+        console.warn('postQuoteToServer error:', err);
+        return { success: false, error: err };
+    }
+}
+
+// Attempt to sync outbox: post queued quotes and remove on success
+async function syncOutbox() {
+    if (!outbox.length) return;
+    const remaining = [];
+    for (const q of outbox) {
+        const result = await postQuoteToServer(q);
+        if (!result.success) {
+            remaining.push(q);
+        } else {
+            // Optionally handle server response (result.data)
+            console.log('Outbox item posted:', result.data);
+        }
+    }
+    outbox = remaining;
+    saveOutbox();
+    if (remaining.length === 0) showFeedback('All pending quotes synced to server.', 'success');
+    else showFeedback(`${remaining.length} quote(s) remain unsynced.`, 'error');
 }
 
 function populateCategories() {
@@ -88,7 +146,7 @@ function createAddQuoteForm() {
 
     const form = document.getElementById('addQuoteForm');
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const text = document.getElementById('quoteText').value.trim();
@@ -99,11 +157,21 @@ function createAddQuoteForm() {
             return;
         }
 
-        quotes.push({ text, category });
+        const newQuote = { text, category };
+        quotes.push(newQuote);
         saveQuotes(); 
         populateCategories(); // ensure new category appears
         form.reset();
-        showFeedback('Quote added successfully!', 'success');
+        showFeedback('Quote added locally.', 'success');
+
+        // Try to POST to server immediately; if fails, enqueue to outbox
+        const result = await postQuoteToServer(newQuote);
+        if (!result.success) {
+            enqueueOutbox(newQuote);
+            showFeedback('Quote queued for syncing (offline or POST failed).', 'error');
+        } else {
+            showFeedback('Quote posted to server.', 'success');
+        }
 
         // If the added quote's category matches current filter, show a random quote from filtered list
         showRandomQuote();
@@ -123,10 +191,6 @@ function showFeedback(message, type) {
 }
 
 // --- Server simulation & syncing logic ---
-
-const SERVER_API_URL = 'https://jsonplaceholder.typicode.com/posts?_limit=8'; // mock endpoint
-const SERVER_SYNC_INTERVAL_MS = 30000; // 30 seconds
-let serverSyncTimer = null;
 
 // New: fetchQuotesFromServer — canonical fetch + mapping with error handling
 async function fetchQuotesFromServer() {
@@ -153,6 +217,9 @@ async function fetchServerQuotes() {
 
 // Compare and sync with local quotes. Server wins on conflicts.
 async function compareAndSync() {
+    // First attempt to flush local outbox
+    await syncOutbox();
+
     const serverQuotes = await fetchServerQuotes();
     if (!serverQuotes) return;
 
@@ -344,6 +411,7 @@ function stopServerSync() {
 // Start sync after DOM ready (hooked below in DOMContentLoaded)
 document.addEventListener('DOMContentLoaded', () => {
     loadQuotes();
+    loadOutbox();
     populateCategories();
     createAddQuoteForm();
 
@@ -360,6 +428,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (categoryFilter) categoryFilter.value = selectedCategory;
     showRandomQuote();
 
-    // start server sync simulation
+    // start server sync simulation (also flush outbox)
     startServerSync();
 });
