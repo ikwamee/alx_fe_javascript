@@ -15,8 +15,6 @@ function loadQuotes() {
 // Save quotes to localStorage
 function saveQuotes() {
     localStorage.setItem('quotes', JSON.stringify(quotes));
-    // Also save last viewed quote to sessionStorage
-    sessionStorage.setItem('lastViewedQuote', JSON.stringify(quotes[quotes.length - 1]));
 }
 
 // Function to populate categories dynamically
@@ -67,65 +65,6 @@ function displayQuote(quote) {
     `;
 }
 
-// Function to export quotes to JSON file
-function exportQuotes() {
-    const quotesJson = JSON.stringify(quotes, null, 2);
-    const blob = new Blob([quotesJson], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'my-quotes.json';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-}
-
-// Function to import quotes from JSON file
-function importQuotes(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const importedQuotes = JSON.parse(e.target.result);
-            if (Array.isArray(importedQuotes) && importedQuotes.every(q => q.text && q.category)) {
-                quotes.push(...importedQuotes);
-                saveQuotes();
-                showFeedback('Quotes imported successfully!', 'success');
-                showRandomQuote();
-            } else {
-                showFeedback('Invalid quote format in file', 'error');
-            }
-        } catch (error) {
-            showFeedback('Error importing quotes', 'error');
-        }
-    };
-    reader.readAsText(file);
-}
-
-// Function to display a random quote
-function showRandomQuote() {
-    const quoteDisplay = document.getElementById('quoteDisplay');
-    const randomIndex = Math.floor(Math.random() * quotes.length);
-    const quote = quotes[randomIndex];
-    
-    // Create elements for the quote and category
-    const quoteText = document.createElement('p');
-    quoteText.textContent = quote.text;
-    
-    const categorySpan = document.createElement('span');
-    categorySpan.textContent = `Category: ${quote.category}`;
-    categorySpan.style.fontStyle = 'italic';
-    
-    // Clear previous content and add new quote
-    quoteDisplay.innerHTML = '';
-    quoteDisplay.appendChild(quoteText);
-    quoteDisplay.appendChild(categorySpan);
-}
-
 // Function to create and display the add quote form
 function createAddQuoteForm() {
     const formContainer = document.createElement('div');
@@ -142,11 +81,6 @@ function createAddQuoteForm() {
             </div>
             <button type="submit">Add Quote</button>
         </form>
-        <div class="import-export-controls">
-            <button id="exportBtn">Export Quotes</button>
-            <input type="file" id="importFile" accept=".json">
-            <label for="importFile" class="import-label">Import Quotes</label>
-        </div>
         <div id="feedback" class="feedback"></div>
     `;
 
@@ -175,10 +109,6 @@ function createAddQuoteForm() {
         showFeedback('Quote added successfully!', 'success');
         showRandomQuote();
     });
-
-    // Add import/export event listeners
-    document.getElementById('exportBtn').addEventListener('click', exportQuotes);
-    document.getElementById('importFile').addEventListener('change', importQuotes);
 }
 
 // Function to show feedback messages
@@ -197,10 +127,12 @@ function showFeedback(message, type) {
 // Add event listener for the "Show New Quote" button
 document.getElementById('newQuote').addEventListener('click', showRandomQuote);
 
+// Add event listener for the category filter
+document.getElementById('categoryFilter').addEventListener('change', filterQuotes);
+
 // Modify the initialization code
 document.addEventListener('DOMContentLoaded', () => {
     loadQuotes();
     populateCategories(); // Populate categories on load
-    createAddQuoteForm();
     showRandomQuote(); // Show initial random quote
 });
