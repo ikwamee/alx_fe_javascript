@@ -1,10 +1,62 @@
 // Initial quotes array
-let quotes = [
-    { text: "Be the change you wish to see in the world.", category: "Inspiration" },
-    { text: "Life is what happens when you're busy making other plans.", category: "Life" },
-    { text: "The only way to do great work is to love what you do.", category: "Work" },
-    { text: "In the middle of difficulty lies opportunity.", category: "Motivation" }
-];
+let quotes = [];
+
+// Load quotes from localStorage on initialization
+function loadQuotes() {
+    const savedQuotes = localStorage.getItem('quotes');
+    quotes = savedQuotes ? JSON.parse(savedQuotes) : [
+        { text: "Be the change you wish to see in the world.", category: "Inspiration" },
+        { text: "Life is what happens when you're busy making other plans.", category: "Life" },
+        { text: "The only way to do great work is to love what you do.", category: "Work" },
+        { text: "In the middle of difficulty lies opportunity.", category: "Motivation" }
+    ];
+}
+
+// Save quotes to localStorage
+function saveQuotes() {
+    localStorage.setItem('quotes', JSON.stringify(quotes));
+    // Also save last viewed quote to sessionStorage
+    sessionStorage.setItem('lastViewedQuote', JSON.stringify(quotes[quotes.length - 1]));
+}
+
+// Function to export quotes to JSON file
+function exportQuotes() {
+    const quotesJson = JSON.stringify(quotes, null, 2);
+    const blob = new Blob([quotesJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'my-quotes.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+// Function to import quotes from JSON file
+function importQuotes(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedQuotes = JSON.parse(e.target.result);
+            if (Array.isArray(importedQuotes) && importedQuotes.every(q => q.text && q.category)) {
+                quotes.push(...importedQuotes);
+                saveQuotes();
+                showFeedback('Quotes imported successfully!', 'success');
+                showRandomQuote();
+            } else {
+                showFeedback('Invalid quote format in file', 'error');
+            }
+        } catch (error) {
+            showFeedback('Error importing quotes', 'error');
+        }
+    };
+    reader.readAsText(file);
+}
 
 // Function to display a random quote
 function showRandomQuote() {
@@ -42,6 +94,11 @@ function createAddQuoteForm() {
             </div>
             <button type="submit">Add Quote</button>
         </form>
+        <div class="import-export-controls">
+            <button id="exportBtn">Export Quotes</button>
+            <input type="file" id="importFile" accept=".json">
+            <label for="importFile" class="import-label">Import Quotes</label>
+        </div>
         <div id="feedback" class="feedback"></div>
     `;
 
@@ -55,28 +112,24 @@ function createAddQuoteForm() {
     form.addEventListener('submit', (e) => {
         e.preventDefault();
         
-        // Get form values
         const text = document.getElementById('quoteText').value.trim();
         const category = document.getElementById('category').value.trim();
         
-        // Validate input
         if (text.length < 10) {
             showFeedback('Quote must be at least 10 characters long', 'error');
             return;
         }
 
-        // Add new quote to array
         quotes.push({ text, category });
-        
-        // Clear form
+        saveQuotes(); // Save to localStorage
         form.reset();
-        
-        // Show success message
         showFeedback('Quote added successfully!', 'success');
-        
-        // Show the new quote
         showRandomQuote();
     });
+
+    // Add import/export event listeners
+    document.getElementById('exportBtn').addEventListener('click', exportQuotes);
+    document.getElementById('importFile').addEventListener('change', importQuotes);
 }
 
 // Function to show feedback messages
@@ -95,8 +148,9 @@ function showFeedback(message, type) {
 // Add event listener for the "Show New Quote" button
 document.getElementById('newQuote').addEventListener('click', showRandomQuote);
 
-// Create the add quote form when the page loads
+// Modify the initialization code
 document.addEventListener('DOMContentLoaded', () => {
+    loadQuotes();
     createAddQuoteForm();
     showRandomQuote(); // Show initial random quote
 });
