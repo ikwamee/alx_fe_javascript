@@ -128,23 +128,27 @@ const SERVER_API_URL = 'https://jsonplaceholder.typicode.com/posts?_limit=8'; //
 const SERVER_SYNC_INTERVAL_MS = 30000; // 30 seconds
 let serverSyncTimer = null;
 
-// Fetch simulated server quotes and map to local quote shape
-async function fetchServerQuotes() {
+// New: fetchQuotesFromServer — canonical fetch + mapping with error handling
+async function fetchQuotesFromServer() {
     try {
         const res = await fetch(SERVER_API_URL);
-        if (!res.ok) throw new Error('Network response not ok');
+        if (!res.ok) throw new Error(`Network response not ok (${res.status})`);
         const posts = await res.json();
-        // Map posts -> { id, text, category }
         const serverQuotes = posts.map(p => ({
             id: `srv-${p.id}`,
             text: (p.body || p.title || '').trim(),
-            category: `User ${p.userId}` // simple category mapping
+            category: `User ${p.userId}`
         })).filter(s => s.text.length > 0);
         return serverQuotes;
     } catch (err) {
-        console.warn('Failed to fetch server quotes:', err);
+        console.warn('fetchQuotesFromServer error:', err);
         return null;
     }
+}
+
+// Keep existing name for compatibility
+async function fetchServerQuotes() {
+    return await fetchQuotesFromServer();
 }
 
 // Compare and sync with local quotes. Server wins on conflicts.
